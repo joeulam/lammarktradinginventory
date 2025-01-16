@@ -1,10 +1,8 @@
 'use client';
-import { PlusOutlined } from '@ant-design/icons';
 import React, { useState, useEffect } from 'react';
-import { Button, Form, Input, InputNumber, Modal, Upload, Card, List } from 'antd';
+import { Button, Form, Input, InputNumber, Modal, Card, List } from 'antd';
 import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { UploadChangeParam } from 'antd/es/upload';
+import { auth, db } from '../firebase';
 
 interface ItemData {
   id: string;
@@ -26,13 +24,24 @@ const App: React.FC = () => {
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [form] = Form.useForm();
   const [data, setData] = useState<ItemData[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  const handleUploadChange = (info: UploadChangeParam) => {
-    if (info.file.status === 'done' && info.file.originFileObj) {
-      const mockUrl = URL.createObjectURL(info.file.originFileObj);
-      setUploadedFile(mockUrl);
-    }
-  };
+  // Handle authentication state changes
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        setUserId(user.uid); // Set the userId if the user is logged in
+        fetchData(user.uid); // Fetch data for the logged-in user
+      } else {
+        setUserId(null); // Clear userId if no user is logged in
+        setData([]); // Clear data
+      }
+    });
+
+    return () => unsubscribe(); // Clean up the subscription
+  }, []);
+
+
 
   const showModal = () => setIsModalOpen(true);
 
@@ -43,12 +52,17 @@ const App: React.FC = () => {
   };
 
   const onFinish = async (values: Partial<ItemData>) => {
+    if (!userId) {
+      console.error('User not authenticated.');
+      return;
+    }
+
     try {
       if (!values.name || !values.cost || !values.company) {
         throw new Error('Name, Cost, and Company are required fields.');
       }
 
-      const docRef = await addDoc(collection(db, 'items'), {
+      const docRef = await addDoc(collection(db, 'users', userId, 'items'), {
         name: values.name,
         company: values.company,
         cost: values.cost,
@@ -62,15 +76,15 @@ const App: React.FC = () => {
       form.resetFields();
       setUploadedFile(null);
       setIsModalOpen(false);
-      fetchData();
+      fetchData(userId); // Refresh data for the current user
     } catch (error) {
       console.error('Error adding document: ', error);
     }
   };
 
-  const fetchData = async () => {
+  const fetchData = async (uid: string) => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'items'));
+      const querySnapshot = await getDocs(collection(db, 'users', uid, 'items'));
       const fetchedData: ItemData[] = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         name: doc.data().name || '',
@@ -87,18 +101,19 @@ const App: React.FC = () => {
   };
 
   const deleteItem = async (id: string) => {
+    if (!userId) {
+      console.error('User not authenticated.');
+      return;
+    }
+
     try {
-      await deleteDoc(doc(db, 'items', id));
+      await deleteDoc(doc(db, 'users', userId, 'items', id));
       console.log(`Item with ID ${id} deleted`);
-      fetchData();
+      fetchData(userId); // Refresh data after deletion
     } catch (error) {
       console.error('Error deleting document: ', error);
     }
   };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   return (
     <>
@@ -145,23 +160,6 @@ const App: React.FC = () => {
           <Form.Item name="barcode" label="Barcode">
             <Input />
           </Form.Item>
-          <Form.Item
-            name="photo"
-            label="Photo"
-            valuePropName="fileList"
-            getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
-          >
-            <Upload
-              action="/upload.do"
-              listType="picture-card"
-              onChange={handleUploadChange}
-            >
-              <div>
-                <PlusOutlined />
-                <div style={{ marginTop: 8 }}>Upload</div>
-              </div>
-            </Upload>
-          </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit">
               Submit
@@ -187,7 +185,6 @@ const App: React.FC = () => {
               <p><strong>Cost:</strong> ${item.cost}</p>
               <p><strong>Description:</strong> {item.description}</p>
               <p><strong>Barcode:</strong> {item.barcode}</p>
-              {item.photo && <img src={item.photo} alt="Uploaded" style={{ width: '100%' }} />}
             </Card>
           </List.Item>
         )}
