@@ -5,6 +5,7 @@ import { Button, Form, Input, InputNumber, Modal, Upload, Card, List } from 'ant
 import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UploadChangeParam } from 'antd/es/upload';
+import { getAnalytics } from 'firebase/analytics';
 
 interface ItemData {
   id: string;
@@ -102,6 +103,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+    getAnalytics();
   }, []);
 
   return (
