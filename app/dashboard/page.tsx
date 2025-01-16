@@ -5,7 +5,6 @@ import { Button, Form, Input, InputNumber, Modal, Upload, Card, List } from 'ant
 import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UploadChangeParam } from 'antd/es/upload';
-import { getAnalytics } from 'firebase/analytics';
 
 interface ItemData {
   id: string;
@@ -45,24 +44,21 @@ const App: React.FC = () => {
 
   const onFinish = async (values: Partial<ItemData>) => {
     try {
-      // Ensure required fields are present
       if (!values.name || !values.cost || !values.company) {
         throw new Error('Name, Cost, and Company are required fields.');
       }
-  
-      // Save data to Firestore
+
       const docRef = await addDoc(collection(db, 'items'), {
         name: values.name,
         company: values.company,
         cost: values.cost,
-        description: values.description || "", // Optional field defaults to null
-        barcode: values.barcode || "",       // Optional field defaults to null
-        photo: uploadedFile || "",           // Optional field defaults to null
+        description: values.description || '',
+        barcode: values.barcode || '',
+        photo: uploadedFile || '',
       });
-  
+
       console.log('Document written with ID: ', docRef.id);
-  
-      // Reset form and state
+
       form.resetFields();
       setUploadedFile(null);
       setIsModalOpen(false);
@@ -71,7 +67,6 @@ const App: React.FC = () => {
       console.error('Error adding document: ', error);
     }
   };
-  
 
   const fetchData = async () => {
     try {
@@ -95,7 +90,7 @@ const App: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'items', id));
       console.log(`Item with ID ${id} deleted`);
-      fetchData(); // Refresh the list after deletion
+      fetchData();
     } catch (error) {
       console.error('Error deleting document: ', error);
     }
@@ -103,7 +98,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    getAnalytics();
   }, []);
 
   return (
