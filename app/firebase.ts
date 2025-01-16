@@ -4,7 +4,7 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_API_KEY,
+  apiKey: "AIzaSyCh2J1qppeeRFbnkISUwWbcaMe-u4OmCCA",
   authDomain: "lammarktrading-3513f.firebaseapp.com",
   projectId: "lammarktrading-3513f",
   storageBucket: "lammarktrading-3513f.firebasestorage.app",
