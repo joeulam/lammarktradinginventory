@@ -42,13 +42,26 @@ const App: React.FC = () => {
     setUploadedFile(null);
   };
 
-  const onFinish = async (values: Omit<ItemData, 'id'>) => {
+  const onFinish = async (values: Partial<ItemData>) => {
     try {
+      // Ensure required fields are present
+      if (!values.name || !values.cost || !values.company) {
+        throw new Error('Name, Cost, and Company are required fields.');
+      }
+  
+      // Save data to Firestore
       const docRef = await addDoc(collection(db, 'items'), {
-        ...values,
-        photo: uploadedFile || '',
+        name: values.name,
+        company: values.company,
+        cost: values.cost,
+        description: values.description || "", // Optional field defaults to null
+        barcode: values.barcode || "",       // Optional field defaults to null
+        photo: uploadedFile || "",           // Optional field defaults to null
       });
+  
       console.log('Document written with ID: ', docRef.id);
+  
+      // Reset form and state
       form.resetFields();
       setUploadedFile(null);
       setIsModalOpen(false);
@@ -57,6 +70,7 @@ const App: React.FC = () => {
       console.error('Error adding document: ', error);
     }
   };
+  
 
   const fetchData = async () => {
     try {
@@ -161,7 +175,7 @@ const App: React.FC = () => {
       </Modal>
 
       <List
-        grid={{ gutter: 16, column: 4 }}
+        grid={{ gutter: 16, column: 2 }}
         dataSource={data}
         renderItem={(item) => (
           <List.Item>
