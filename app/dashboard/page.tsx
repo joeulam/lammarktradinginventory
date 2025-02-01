@@ -78,20 +78,26 @@ const App: React.FC = () => {
         });
         console.log("Document written with ID: ", docRef.id);
       } else {
-          const docRef = doc(db, "users", userId as (string), "items", currentObjectId as (string));
-          await updateDoc(docRef, {
-            name: values.name,
-            company: values.company,
-            cost: values.cost,
-            description: values.description || "",
-            barcode: values.barcode || "",
-            quantity: values.quantity || 0,
-          });
-          setIsEditing(false)
+        const docRef = doc(
+          db,
+          "users",
+          userId as string,
+          "items",
+          currentObjectId as string
+        );
+        await updateDoc(docRef, {
+          name: values.name,
+          company: values.company,
+          cost: values.cost,
+          description: values.description || "",
+          barcode: values.barcode || "",
+          quantity: values.quantity || 0,
+        });
+        setIsEditing(false);
       }
       form.resetFields();
       setIsModalOpen(false);
-      setCurrentObjectId("")
+      setCurrentObjectId("");
       fetchData(userId); // Refresh data for the current user
     } catch (error) {
       console.error("Error adding document: ", error);
@@ -135,14 +141,30 @@ const App: React.FC = () => {
 
   const editCard = (item: ItemData) => {
     form.setFieldsValue(item);
-    setCurrentObjectId(item.id)
+    setCurrentObjectId(item.id);
     setIsModalOpen(true);
     setIsEditing(true);
   };
 
+  const quickRemove = async (item: ItemData) => {
+    const docRef = doc(
+      db,
+      "users",
+      userId as string,
+      "items",
+      item.id as string
+    );
+    
+    await updateDoc(docRef, {
+      quantity: item.quantity-1 || 0,
+    });
+    item.quantity = item.quantity - 1
+    console.log(item.quantity)
+    fetchData(userId!);
+  }
   return (
     <>
-      <div style={{ width: "80vw", margin: "0 auto" }}>
+      <div className="w-full lg:w-[80vw] mx-auto">
         <Modal
           title="Add New Item"
           open={isModalOpen}
@@ -195,13 +217,20 @@ const App: React.FC = () => {
         </Modal>
 
         <List
-          style={{marginTop:'10vh'}}
-          grid={{ gutter: 16, column: 2 }}
+          style={{ marginTop: "10vh" }}
+          grid={{ gutter: 16, xs: 1,
+            sm: 2, }}
           dataSource={data}
           renderItem={(item) => (
             <List.Item>
               <Card
-                title={item.name}
+                title={
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                    <h3>{item.name}</h3>
+                    <Button onClick={() => quickRemove(item)}>Quick Remove</Button>
+                  </div>
+                }
+                
                 actions={[
                   <Button
                     key="default"
@@ -214,16 +243,16 @@ const App: React.FC = () => {
                   <Button
                     key="default"
                     type="link"
-                    onClick={() => console.log("add")}
+                    onClick={() => editCard(item)}
                   >
-                    Add to list
+                    Edit
                   </Button>,
                   <Button
                     key="default"
                     type="link"
-                    onClick={() => editCard(item)}
+                    onClick={() => console.log("add")}
                   >
-                    Edit
+                    Add to list
                   </Button>,
                 ]}
               >
