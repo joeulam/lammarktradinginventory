@@ -28,11 +28,15 @@ const layout = {
 
 const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [data, setData] = useState<ItemData[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [currentObjectId, setCurrentObjectId] = useState<string | null>(null);
+  const [listData, setListData] = useState<ItemData[]>([]);
+  const [listDataModel, setListDataModel] = useState(false);
+  const [currentData, setCurrentData] = useState<ItemData[]>();
 
   // Handle authentication state changes
   useEffect(() => {
@@ -40,6 +44,7 @@ const App: React.FC = () => {
       if (user) {
         setUserId(user.uid); // Set the userId if the user is logged in
         fetchData(user.uid); // Fetch data for the logged-in user
+        fetchListData(user.uid);
       } else {
         setUserId(null); // Clear userId if no user is logged in
         setData([]); // Clear data
@@ -50,10 +55,14 @@ const App: React.FC = () => {
   }, []);
 
   const showModal = () => setIsModalOpen(true);
-
+  const showListModal = () => setIsListModalOpen(true);
+  const handleCancelList = () => {
+    setIsListModalOpen(false);
+  };
   const handleCancel = () => {
     setIsModalOpen(false);
     setIsEditing(false);
+    setListDataModel(false)
     form.resetFields();
   };
 
@@ -154,14 +163,65 @@ const App: React.FC = () => {
       "items",
       item.id as string
     );
-    
+
     await updateDoc(docRef, {
-      quantity: item.quantity-1 || 0,
+      quantity: item.quantity - 1 || 0,
     });
-    item.quantity = item.quantity - 1
-    console.log(item.quantity)
+    item.quantity = item.quantity - 1;
     fetchData(userId!);
+  };
+
+  const fetchListData = async (uid: string) => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "users", uid, "list"));
+      const fetchedList: ItemData[] = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as ItemData[];
+      setListData(fetchedList);
+      console.log(fetchedList)
+    } catch (error) {
+      console.error("Error fetching list data: ", error);
+    }
+  };
+
+  const showListInput = (item: ItemData[]) => {
+    setListDataModel(true)
+    setCurrentData(item)
   }
+
+  const addToList = async (item: Partial<ItemData>) => {
+    // Wait until show input is done
+    if (!userId) return;
+    try {
+      await addDoc(collection(db, "users", userId, "list"), {
+        name: (currentData as Partial<ItemData>).name,
+        company: (currentData as Partial<ItemData>).company,
+        cost: (currentData as Partial<ItemData>).cost,
+        description: item.description || "",
+        barcode: (currentData as Partial<ItemData>).barcode || "",
+        quantity: item.quantity || 0,
+      });
+      fetchListData(userId);
+      setCurrentData(undefined)
+      setListDataModel(false)
+      form.resetFields();
+    } catch (error) {
+      console.error("Error adding to list: ", error);
+    }
+  };
+
+  const removeFromList = async (id: string) => {
+    if (!userId) return;
+    try {
+      await deleteDoc(doc(db, "users", userId, "list", id));
+      fetchListData(userId);
+      console.log(id);
+    } catch (error) {
+      console.error("Error removing from list: ", error);
+    }
+  };
+
   return (
     <>
       <div className="w-full lg:w-[80vw] mx-auto">
@@ -218,19 +278,25 @@ const App: React.FC = () => {
 
         <List
           style={{ marginTop: "10vh" }}
-          grid={{ gutter: 16, xs: 1,
-            sm: 2, }}
+          grid={{ gutter: 16, xs: 1, sm: 2, md: 2, lg: 2, xl: 3 }}
           dataSource={data}
           renderItem={(item) => (
             <List.Item>
               <Card
                 title={
-                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
                     <h3>{item.name}</h3>
-                    <Button onClick={() => quickRemove(item)}>Quick Remove</Button>
+                    <Button onClick={() => quickRemove(item)}>
+                      Quick Remove
+                    </Button>
                   </div>
                 }
-                
                 actions={[
                   <Button
                     key="default"
@@ -250,7 +316,7 @@ const App: React.FC = () => {
                   <Button
                     key="default"
                     type="link"
-                    onClick={() => console.log("add")}
+                    onClick={() => showListInput(item as unknown as ItemData[])}
                   >
                     Add to list
                   </Button>,
@@ -269,13 +335,88 @@ const App: React.FC = () => {
             </List.Item>
           )}
         />
+        <Modal
+          title="List Of Item"
+          open={isListModalOpen}
+          onCancel={handleCancelList}
+          footer={null}
+        >
+          <List
+            style={{ marginTop: "10vh" }}
+            grid={{ gutter: 16, xs: 1, sm: 2, md: 2, lg: 2, xl: 3 }}
+            dataSource={listData}
+            renderItem={(item) => (
+              <List.Item>
+                <Card
+                  title={
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <h3>{item.name}</h3>
+                    </div>
+                  }
+                  actions={[
+                    <Button
+                      key="default"
+                      danger
+                      onClick={() => removeFromList(item.id)}
+                    >
+                      Delete
+                    </Button>,
+                  ]}
+                >
+                  <p>
+                    <strong>Quantity:</strong> {item.quantity}
+                  </p>
+                  <p>
+                    <strong>Note:</strong> {item.description}
+                  </p>
+                </Card>
+              </List.Item>
+            )}
+          />
+        </Modal>
+
         <div style={{ display: "flex", justifyContent: "space-evenly" }}>
           <Button type="primary" onClick={showModal}>
             Add new item
           </Button>
-          <Button type="primary" onClick={showModal}>
+          <Button type="primary" onClick={showListModal}>
             Check list
           </Button>
+
+
+          <Modal
+          title="Add to list"
+          open={listDataModel}
+          onCancel={handleCancel}
+          footer={null}
+          >
+          <Form
+            {...layout}
+            form={form}
+            name="itemForm"
+            onFinish={addToList}
+            style={{ maxWidth: 600 }}
+          >
+            <Form.Item name="quantity" label="Quantity">
+              <InputNumber />
+            </Form.Item>
+            <Form.Item name="description" label="Description">
+              <Input.TextArea />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit">
+                Submit
+              </Button>
+            </Form.Item>
+          </Form>
+        </Modal>
+
         </div>
       </div>
     </>
