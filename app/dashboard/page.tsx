@@ -1,6 +1,15 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Button, Form, Input, InputNumber, Modal, Card, List } from "antd";
+import {
+  Button,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Card,
+  List,
+  Typography,
+} from "antd";
 import {
   collection,
   addDoc,
@@ -62,7 +71,7 @@ const App: React.FC = () => {
   const handleCancel = () => {
     setIsModalOpen(false);
     setIsEditing(false);
-    setListDataModel(false)
+    setListDataModel(false);
     form.resetFields();
   };
 
@@ -179,16 +188,16 @@ const App: React.FC = () => {
         ...doc.data(),
       })) as ItemData[];
       setListData(fetchedList);
-      console.log(fetchedList)
+      console.log(fetchedList);
     } catch (error) {
       console.error("Error fetching list data: ", error);
     }
   };
 
   const showListInput = (item: ItemData[]) => {
-    setListDataModel(true)
-    setCurrentData(item)
-  }
+    setListDataModel(true);
+    setCurrentData(item);
+  };
 
   const addToList = async (item: Partial<ItemData>) => {
     // Wait until show input is done
@@ -203,8 +212,8 @@ const App: React.FC = () => {
         quantity: item.quantity || 0,
       });
       fetchListData(userId);
-      setCurrentData(undefined)
-      setListDataModel(false)
+      setCurrentData(undefined);
+      setListDataModel(false);
       form.resetFields();
     } catch (error) {
       console.error("Error adding to list: ", error);
@@ -221,130 +230,70 @@ const App: React.FC = () => {
       console.error("Error removing from list: ", error);
     }
   };
+  const { Title } = Typography;
 
   return (
     <>
-      <div className="w-full lg:w-[80vw] mx-auto">
-        <Modal
-          title="Add New Item"
-          open={isModalOpen}
-          onCancel={handleCancel}
-          footer={null}
-        >
-          <Form
-            {...layout}
-            form={form}
-            name="itemForm"
-            onFinish={onFinish}
-            style={{ maxWidth: 600 }}
+      <div style={{ padding: "2%" }}>
+        <Title>Current Inventory</Title>
+        <div className="w-full lg:w-[80vw] mx-auto">
+          <Modal
+            title="Add New Item"
+            open={isModalOpen}
+            onCancel={handleCancel}
+            footer={null}
           >
-            <Form.Item
-              name="name"
-              label="Name"
-              rules={[{ required: true, message: "Please enter the name" }]}
+            <Form
+              {...layout}
+              form={form}
+              name="itemForm"
+              onFinish={onFinish}
+              style={{ maxWidth: 600 }}
             >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="company"
-              label="Company"
-              rules={[{ required: true, message: "Please enter the company" }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="cost"
-              label="Cost"
-              rules={[{ required: true, message: "Please enter the cost" }]}
-            >
-              <InputNumber />
-            </Form.Item>
-            <Form.Item name="quantity" label="Quantity">
-              <InputNumber />
-            </Form.Item>
-            <Form.Item name="description" label="Description">
-              <Input.TextArea />
-            </Form.Item>
-            <Form.Item name="barcode" label="Barcode">
-              <Input />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit">
-                Submit
-              </Button>
-            </Form.Item>
-          </Form>
-        </Modal>
-
-        <List
-          style={{ marginTop: "10vh" }}
-          grid={{ gutter: 16, xs: 1, sm: 2, md: 2, lg: 2, xl: 3 }}
-          dataSource={data}
-          renderItem={(item) => (
-            <List.Item>
-              <Card
-                title={
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <h3>{item.name}</h3>
-                    <Button onClick={() => quickRemove(item)}>
-                      Quick Remove
-                    </Button>
-                  </div>
-                }
-                actions={[
-                  <Button
-                    key="default"
-                    type="link"
-                    danger
-                    onClick={() => deleteItem(item.id)}
-                  >
-                    Delete
-                  </Button>,
-                  <Button
-                    key="default"
-                    type="link"
-                    onClick={() => editCard(item)}
-                  >
-                    Edit
-                  </Button>,
-                  <Button
-                    key="default"
-                    type="link"
-                    onClick={() => showListInput(item as unknown as ItemData[])}
-                  >
-                    Add to list
-                  </Button>,
+              <Form.Item
+                name="name"
+                label="Name"
+                rules={[{ required: true, message: "Please enter the name" }]}
+              >
+                <Input />
+              </Form.Item>
+              <Form.Item
+                name="company"
+                label="Company"
+                rules={[
+                  { required: true, message: "Please enter the company" },
                 ]}
               >
-                <p>
-                  <strong>Company:</strong> {item.company}
-                </p>
-                <p>
-                  <strong>Cost:</strong> ${item.cost}
-                </p>
-                <p>
-                  <strong>Quantity:</strong> {item.quantity}
-                </p>
-              </Card>
-            </List.Item>
-          )}
-        />
-        <Modal
-          title="List Of Item"
-          open={isListModalOpen}
-          onCancel={handleCancelList}
-          footer={null}
-        >
+                <Input />
+              </Form.Item>
+              <Form.Item
+                name="cost"
+                label="Cost"
+                rules={[{ required: true, message: "Please enter the cost" }]}
+              >
+                <InputNumber />
+              </Form.Item>
+              <Form.Item name="quantity" label="Quantity">
+                <InputNumber />
+              </Form.Item>
+              <Form.Item name="description" label="Description">
+                <Input.TextArea />
+              </Form.Item>
+              <Form.Item name="barcode" label="Barcode">
+                <Input />
+              </Form.Item>
+              <Form.Item>
+                <Button type="primary" htmlType="submit">
+                  Submit
+                </Button>
+              </Form.Item>
+            </Form>
+          </Modal>
+
           <List
             style={{ marginTop: "10vh" }}
             grid={{ gutter: 16, xs: 1, sm: 2, md: 2, lg: 2, xl: 3 }}
-            dataSource={listData}
+            dataSource={data}
             renderItem={(item) => (
               <List.Item>
                 <Card
@@ -357,66 +306,132 @@ const App: React.FC = () => {
                       }}
                     >
                       <h3>{item.name}</h3>
+                      <Button onClick={() => quickRemove(item)}>
+                        Quick Remove
+                      </Button>
                     </div>
                   }
                   actions={[
                     <Button
                       key="default"
+                      type="link"
                       danger
-                      onClick={() => removeFromList(item.id)}
+                      onClick={() => deleteItem(item.id)}
                     >
                       Delete
+                    </Button>,
+                    <Button
+                      key="default"
+                      type="link"
+                      onClick={() => editCard(item)}
+                    >
+                      Edit
+                    </Button>,
+                    <Button
+                      key="default"
+                      type="link"
+                      onClick={() =>
+                        showListInput(item as unknown as ItemData[])
+                      }
+                    >
+                      Add to list
                     </Button>,
                   ]}
                 >
                   <p>
-                    <strong>Quantity:</strong> {item.quantity}
+                    <strong>Company:</strong> {item.company}
                   </p>
                   <p>
-                    <strong>Note:</strong> {item.description}
+                    <strong>Cost:</strong> ${item.cost}
+                  </p>
+                  <p>
+                    <strong>Quantity:</strong> {item.quantity}
                   </p>
                 </Card>
               </List.Item>
             )}
           />
-        </Modal>
-
-        <div style={{ display: "flex", justifyContent: "space-evenly" }}>
-          <Button type="primary" onClick={showModal}>
-            Add new item
-          </Button>
-          <Button type="primary" onClick={showListModal}>
-            Check list
-          </Button>
-
-
           <Modal
-          title="Add to list"
-          open={listDataModel}
-          onCancel={handleCancel}
-          footer={null}
+            title="List Of Item"
+            open={isListModalOpen}
+            onCancel={handleCancelList}
+            footer={null}
           >
-          <Form
-            {...layout}
-            form={form}
-            name="itemForm"
-            onFinish={addToList}
-            style={{ maxWidth: 600 }}
-          >
-            <Form.Item name="quantity" label="Quantity">
-              <InputNumber />
-            </Form.Item>
-            <Form.Item name="description" label="Description">
-              <Input.TextArea />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit">
-                Submit
-              </Button>
-            </Form.Item>
-          </Form>
-        </Modal>
+            <List
+              style={{ marginTop: "10vh" }}
+              grid={{ gutter: 16, xs: 1, sm: 2, md: 2, lg: 2, xl: 3 }}
+              dataSource={listData}
+              renderItem={(item) => (
+                <List.Item>
+                  <Card
+                    title={
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <h3>{item.name}</h3>
+                      </div>
+                    }
+                    actions={[
+                      <Button
+                        key="default"
+                        danger
+                        onClick={() => removeFromList(item.id)}
+                      >
+                        Delete
+                      </Button>,
+                    ]}
+                  >
+                    <p>
+                      <strong>Quantity:</strong> {item.quantity}
+                    </p>
+                    <p>
+                      <strong>Note:</strong> {item.description}
+                    </p>
+                  </Card>
+                </List.Item>
+              )}
+            />
+          </Modal>
 
+          <div style={{ display: "flex", justifyContent: "space-evenly" }}>
+            <Button type="primary" onClick={showModal}>
+              Add new item
+            </Button>
+            <Button type="primary" onClick={showListModal}>
+              Check list
+            </Button>
+
+            <Modal
+              title="Add to list"
+              open={listDataModel}
+              onCancel={handleCancel}
+              footer={null}
+            >
+              <Form
+                {...layout}
+                form={form}
+                name="itemForm"
+                onFinish={addToList}
+                style={{ maxWidth: 600 }}
+              >
+                <Form.Item name="quantity" label="Quantity">
+                  <InputNumber />
+                </Form.Item>
+                <Form.Item name="description" label="Description">
+                  <Input.TextArea />
+                </Form.Item>
+                <Form.Item>
+                  <Button type="primary" htmlType="submit">
+                    Submit
+                  </Button>
+                </Form.Item>
+              </Form>
+            </Modal>
+          </div>
         </div>
       </div>
     </>
