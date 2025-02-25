@@ -38,7 +38,11 @@ const layout = {
 const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isListModalOpen, setIsListModalOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+
   const [form] = Form.useForm();
+  const [toDoList] = Form.useForm();
+  const [toDoListAdd] = Form.useForm();
   const [data, setData] = useState<ItemData[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -188,7 +192,6 @@ const App: React.FC = () => {
         ...doc.data(),
       })) as ItemData[];
       setListData(fetchedList);
-      console.log(fetchedList);
     } catch (error) {
       console.error("Error fetching list data: ", error);
     }
@@ -217,6 +220,22 @@ const App: React.FC = () => {
       form.resetFields();
     } catch (error) {
       console.error("Error adding to list: ", error);
+    }
+  };
+
+  const handleQuickAdd = async (values: Partial<ItemData>) => {
+    if (!userId) return;
+    try {
+      await addDoc(collection(db, "users", userId, "list"), {
+        name: values.name || "Unnamed Item",
+        description: values.description || "",
+        quantity: values.quantity || 1,
+      });
+      toDoListAdd.resetFields();
+      fetchListData(userId);
+      setIsQuickAddOpen(false);
+    } catch (error) {
+      console.error("Error adding quick item: ", error);
     }
   };
 
@@ -358,43 +377,54 @@ const App: React.FC = () => {
             footer={null}
           >
             <List
-              style={{ marginTop: "10vh" }}
-              grid={{ gutter: 16, xs: 1, sm: 2, md: 2, lg: 2, xl: 3 }}
               dataSource={listData}
               renderItem={(item) => (
-                <List.Item>
-                  <Card
-                    title={
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <h3>{item.name}</h3>
-                      </div>
-                    }
-                    actions={[
-                      <Button
-                        key="default"
-                        danger
-                        onClick={() => removeFromList(item.id)}
-                      >
-                        Delete
-                      </Button>,
-                    ]}
-                  >
-                    <p>
-                      <strong>Quantity:</strong> {item.quantity}
-                    </p>
-                    <p>
-                      <strong>Note:</strong> {item.description}
-                    </p>
-                  </Card>
+                <List.Item
+                  actions={[
+                    <Button key="" onClick={() => removeFromList(item.id)}>
+                      Remove
+                    </Button>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    title={item.name}
+                    description={item.description}
+                  />
+                  <div>Quantity: {item.quantity}</div>
                 </List.Item>
               )}
             />
+            <Button
+              onClick={() => {
+                setIsQuickAddOpen(!isQuickAddOpen);
+                console.log(isQuickAddOpen);
+              }}
+            >
+              Quick Add
+            </Button>
+          </Modal>
+          <Modal
+            title="Quick Add Item"
+            open={isQuickAddOpen}
+            onCancel={() => setIsQuickAddOpen(false)}
+            footer={null}
+          >
+            <Form form={toDoListAdd} onFinish={handleQuickAdd}>
+              <Form.Item name="name" label="Name">
+                <Input />
+              </Form.Item>
+              <Form.Item name="description" label="Description">
+                <Input.TextArea />
+              </Form.Item>
+              <Form.Item name="quantity" label="Quantity">
+                <InputNumber min={1} />
+              </Form.Item>
+              <Form.Item>
+                <Button type="primary" htmlType="submit">
+                  Add
+                </Button>
+              </Form.Item>
+            </Form>
           </Modal>
 
           <div style={{ display: "flex", justifyContent: "space-evenly" }}>
@@ -413,7 +443,7 @@ const App: React.FC = () => {
             >
               <Form
                 {...layout}
-                form={form}
+                form={toDoList}
                 name="itemForm"
                 onFinish={addToList}
                 style={{ maxWidth: 600 }}
