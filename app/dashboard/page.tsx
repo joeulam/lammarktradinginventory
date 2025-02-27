@@ -19,16 +19,11 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
-
-interface ItemData {
-  id: string;
-  name: string;
-  company: string;
-  cost: number;
-  description: string;
-  barcode: string;
-  quantity: number;
-}
+import { ItemData } from "@/functions/dataType";
+import { fetchData, quickRemove } from "../../functions/helpFunction";
+import { BarcodeScanner } from "react-barcode-scanner";
+import "react-barcode-scanner/polyfill";
+import { CameraOutlined } from "@ant-design/icons";
 
 const layout = {
   labelCol: { span: 8 },
@@ -56,7 +51,7 @@ const App: React.FC = () => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         setUserId(user.uid); // Set the userId if the user is logged in
-        fetchData(user.uid); // Fetch data for the logged-in user
+        getData(user.uid); // Fetch data for the logged-in user
         fetchListData(user.uid);
       } else {
         setUserId(null); // Clear userId if no user is logged in
@@ -120,30 +115,15 @@ const App: React.FC = () => {
       form.resetFields();
       setIsModalOpen(false);
       setCurrentObjectId("");
-      fetchData(userId); // Refresh data for the current user
+      getData(userId); // Refresh data for the current user
     } catch (error) {
       console.error("Error adding document: ", error);
     }
   };
 
-  const fetchData = async (uid: string) => {
-    try {
-      const querySnapshot = await getDocs(
-        collection(db, "users", uid, "items")
-      );
-      const fetchedData: ItemData[] = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        name: doc.data().name || "",
-        company: doc.data().company || "",
-        cost: doc.data().cost || 0,
-        description: doc.data().description || "",
-        barcode: doc.data().barcode || "",
-        quantity: doc.data().quantity || 1,
-      }));
-      setData(fetchedData);
-    } catch (error) {
-      console.error("Error fetching data: ", error);
-    }
+  const getData = async (uid: string) => {
+    const response = await fetchData(uid);
+    setData(response!);
   };
 
   const deleteItem = async (id: string) => {
@@ -155,7 +135,7 @@ const App: React.FC = () => {
     try {
       await deleteDoc(doc(db, "users", userId, "items", id));
       console.log(`Item with ID ${id} deleted`);
-      fetchData(userId); // Refresh data after deletion
+      getData(userId); // Refresh data after deletion
     } catch (error) {
       console.error("Error deleting document: ", error);
     }
@@ -168,20 +148,9 @@ const App: React.FC = () => {
     setIsEditing(true);
   };
 
-  const quickRemove = async (item: ItemData) => {
-    const docRef = doc(
-      db,
-      "users",
-      userId as string,
-      "items",
-      item.id as string
-    );
-
-    await updateDoc(docRef, {
-      quantity: item.quantity - 1 || 0,
-    });
-    item.quantity = item.quantity - 1;
-    fetchData(userId!);
+  const removeOneEntry = async (item: ItemData) => {
+    quickRemove(item, userId as string);
+    getData(userId!);
   };
 
   const fetchListData = async (uid: string) => {
@@ -249,6 +218,14 @@ const App: React.FC = () => {
       console.error("Error removing from list: ", error);
     }
   };
+  const [barcode, setBarcode] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  const handleScan = (scannedValue: string) => {
+    setBarcode(scannedValue);
+    setScannerOpen(false); // Close scanner after scan
+  };
+
   const { Title } = Typography;
 
   return (
@@ -299,7 +276,23 @@ const App: React.FC = () => {
                 <Input.TextArea />
               </Form.Item>
               <Form.Item name="barcode" label="Barcode">
-                <Input />
+                <Input
+                  value={barcode}
+                  onChange={(e) => setBarcode(e.target.value)}
+                />
+                <Button
+                  type="primary"
+                  icon={<CameraOutlined />}
+                  onClick={() => setScannerOpen(!scannerOpen)}
+                >
+                  {scannerOpen ? "Close Scanner" : "Scan Barcode"}
+                </Button>
+                {scannerOpen && (
+                  <BarcodeScanner
+                    options={{ delay: 500, formats: ["code_128"] }}
+                    onCapture={(e) => handleScan(e[0].rawValue)}
+                  />
+                )}
               </Form.Item>
               <Form.Item>
                 <Button type="primary" htmlType="submit">
@@ -325,7 +318,7 @@ const App: React.FC = () => {
                       }}
                     >
                       <h3>{item.name}</h3>
-                      <Button onClick={() => quickRemove(item)}>
+                      <Button onClick={() => removeOneEntry(item)}>
                         Quick Remove
                       </Button>
                     </div>
