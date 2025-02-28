@@ -9,6 +9,7 @@ import {
   Card,
   List,
   Typography,
+  // Upload,
 } from "antd";
 import {
   collection,
@@ -45,7 +46,8 @@ const App: React.FC = () => {
   const [listData, setListData] = useState<ItemData[]>([]);
   const [listDataModel, setListDataModel] = useState(false);
   const [currentData, setCurrentData] = useState<ItemData[]>();
-
+  const [barcode, setBarcode] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
   // Handle authentication state changes
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -71,6 +73,7 @@ const App: React.FC = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setListDataModel(false);
+    setBarcode("")
     form.resetFields();
   };
 
@@ -112,6 +115,7 @@ const App: React.FC = () => {
         });
         setIsEditing(false);
       }
+      setBarcode("")
       form.resetFields();
       setIsModalOpen(false);
       setCurrentObjectId("");
@@ -186,6 +190,7 @@ const App: React.FC = () => {
       fetchListData(userId);
       setCurrentData(undefined);
       setListDataModel(false);
+      setBarcode("")
       form.resetFields();
     } catch (error) {
       console.error("Error adding to list: ", error);
@@ -218,8 +223,7 @@ const App: React.FC = () => {
       console.error("Error removing from list: ", error);
     }
   };
-  const [barcode, setBarcode] = useState("");
-  const [scannerOpen, setScannerOpen] = useState(false);
+
 
   const handleScan = (scannedValue: string) => {
     setBarcode(scannedValue);
@@ -244,8 +248,8 @@ const App: React.FC = () => {
               form={form}
               name="itemForm"
               onFinish={onFinish}
-              style={{ maxWidth: 600 }}
-            >
+              style={{padding:0, margin:0}}
+              >
               <Form.Item
                 name="name"
                 label="Name"
@@ -275,6 +279,7 @@ const App: React.FC = () => {
               <Form.Item name="description" label="Description">
                 <Input.TextArea />
               </Form.Item>
+              
               <Form.Item name="barcode" label="Barcode">
                 <Input
                   value={barcode}
@@ -283,17 +288,22 @@ const App: React.FC = () => {
                 <Button
                   type="primary"
                   icon={<CameraOutlined />}
+                  style={{marginTop:"3vh"}}
                   onClick={() => setScannerOpen(!scannerOpen)}
                 >
                   {scannerOpen ? "Close Scanner" : "Scan Barcode"}
                 </Button>
                 {scannerOpen && (
                   <BarcodeScanner
-                    options={{ delay: 500, formats: ["code_128"] }}
+                    options={{ delay: 500, formats: ["code_128","code_39","code_93","codabar", "ean_13", "ean_8", "itf", "qr_code","upc_a", "upc_e"] }}
                     onCapture={(e) => handleScan(e[0].rawValue)}
                   />
                 )}
               </Form.Item>
+              {/* <Form.Item>
+                  <Button icon={<UploadOutlined />}>Click to Upload</Button>
+              </Form.Item> */}
+              
               <Form.Item>
                 <Button type="primary" htmlType="submit">
                   Submit
@@ -390,7 +400,6 @@ const App: React.FC = () => {
             <Button
               onClick={() => {
                 setIsQuickAddOpen(!isQuickAddOpen);
-                console.log(isQuickAddOpen);
               }}
             >
               Quick Add

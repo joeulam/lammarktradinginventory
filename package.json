@@ -10,10 +10,12 @@
   },
   "dependencies": {
     "antd": "^5.23.1",
+    "antd-img-crop": "^4.24.0",
     "firebase": "^10.14.1",
     "firebase-tools": "^13.29.1",
     "firebaseui": "^6.1.0",
     "next": "15.1.4",
+    "next-cloudinary": "^6.16.0",
     "react": "^19.0.0",
     "react-barcode-scanner": "^3.2.1",
     "react-dom": "^19.0.0"
