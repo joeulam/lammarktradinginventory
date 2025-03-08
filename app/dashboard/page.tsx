@@ -11,17 +11,16 @@ import {
   Typography,
   // Upload,
 } from "antd";
-import {
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  doc,
-  updateDoc,
-} from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { ItemData } from "@/functions/dataType";
-import { fetchData, quickRemove } from "../../functions/helpFunction";
+import {
+  deleteItem,
+  fetchListData,
+  getData,
+  quickRemove,
+  removeFromList,
+} from "../../functions/helpFunction";
 import { BarcodeScanner } from "react-barcode-scanner";
 import "react-barcode-scanner/polyfill";
 import { CameraOutlined } from "@ant-design/icons";
@@ -35,7 +34,6 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-
   const [form] = Form.useForm();
   const [toDoList] = Form.useForm();
   const [toDoListAdd] = Form.useForm();
@@ -50,17 +48,17 @@ const App: React.FC = () => {
   const [scannerOpen, setScannerOpen] = useState(false);
   // Handle authentication state changes
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
         setUserId(user.uid); // Set the userId if the user is logged in
-        getData(user.uid); // Fetch data for the logged-in user
-        fetchListData(user.uid);
+        setData(await getData(user.uid));
+        // Fetch data for the logged-in user
+        setListData(await fetchListData(user.uid));
       } else {
         setUserId(null); // Clear userId if no user is logged in
         setData([]); // Clear data
       }
     });
-
     return () => unsubscribe(); // Clean up the subscription
   }, []);
 
@@ -73,7 +71,7 @@ const App: React.FC = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setListDataModel(false);
-    setBarcode("")
+    setBarcode("");
     form.resetFields();
   };
 
@@ -115,33 +113,14 @@ const App: React.FC = () => {
         });
         setIsEditing(false);
       }
-      setBarcode("")
+      setBarcode("");
       form.resetFields();
       setIsModalOpen(false);
       setCurrentObjectId("");
-      getData(userId); // Refresh data for the current user
+
+      setData(await getData(userId)); // Refresh data for the current user
     } catch (error) {
       console.error("Error adding document: ", error);
-    }
-  };
-
-  const getData = async (uid: string) => {
-    const response = await fetchData(uid);
-    setData(response!);
-  };
-
-  const deleteItem = async (id: string) => {
-    if (!userId) {
-      console.error("User not authenticated.");
-      return;
-    }
-
-    try {
-      await deleteDoc(doc(db, "users", userId, "items", id));
-      console.log(`Item with ID ${id} deleted`);
-      getData(userId); // Refresh data after deletion
-    } catch (error) {
-      console.error("Error deleting document: ", error);
     }
   };
 
@@ -154,20 +133,7 @@ const App: React.FC = () => {
 
   const removeOneEntry = async (item: ItemData) => {
     quickRemove(item, userId as string);
-    getData(userId!);
-  };
-
-  const fetchListData = async (uid: string) => {
-    try {
-      const querySnapshot = await getDocs(collection(db, "users", uid, "list"));
-      const fetchedList: ItemData[] = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as ItemData[];
-      setListData(fetchedList);
-    } catch (error) {
-      console.error("Error fetching list data: ", error);
-    }
+    setData(await getData(userId!));
   };
 
   const showListInput = (item: ItemData[]) => {
@@ -187,10 +153,10 @@ const App: React.FC = () => {
         barcode: (currentData as Partial<ItemData>).barcode || "",
         quantity: item.quantity || 0,
       });
-      fetchListData(userId);
+      setListData(await fetchListData(userId));
       setCurrentData(undefined);
       setListDataModel(false);
-      setBarcode("")
+      setBarcode("");
       form.resetFields();
     } catch (error) {
       console.error("Error adding to list: ", error);
@@ -206,24 +172,12 @@ const App: React.FC = () => {
         quantity: values.quantity || 1,
       });
       toDoListAdd.resetFields();
-      fetchListData(userId);
+      setListData(await fetchListData(userId));
       setIsQuickAddOpen(false);
     } catch (error) {
       console.error("Error adding quick item: ", error);
     }
   };
-
-  const removeFromList = async (id: string) => {
-    if (!userId) return;
-    try {
-      await deleteDoc(doc(db, "users", userId, "list", id));
-      fetchListData(userId);
-      console.log(id);
-    } catch (error) {
-      console.error("Error removing from list: ", error);
-    }
-  };
-
 
   const handleScan = (scannedValue: string) => {
     setBarcode(scannedValue);
@@ -248,8 +202,8 @@ const App: React.FC = () => {
               form={form}
               name="itemForm"
               onFinish={onFinish}
-              style={{padding:0, margin:0}}
-              >
+              style={{ padding: 0, margin: 0 }}
+            >
               <Form.Item
                 name="name"
                 label="Name"
@@ -279,7 +233,7 @@ const App: React.FC = () => {
               <Form.Item name="description" label="Description">
                 <Input.TextArea />
               </Form.Item>
-              
+
               <Form.Item name="barcode" label="Barcode">
                 <Input
                   value={barcode}
@@ -288,14 +242,28 @@ const App: React.FC = () => {
                 <Button
                   type="primary"
                   icon={<CameraOutlined />}
-                  style={{marginTop:"3vh"}}
+                  style={{ marginTop: "3vh" }}
                   onClick={() => setScannerOpen(!scannerOpen)}
                 >
                   {scannerOpen ? "Close Scanner" : "Scan Barcode"}
                 </Button>
                 {scannerOpen && (
                   <BarcodeScanner
-                    options={{ delay: 500, formats: ["code_128","code_39","code_93","codabar", "ean_13", "ean_8", "itf", "qr_code","upc_a", "upc_e"] }}
+                    options={{
+                      delay: 500,
+                      formats: [
+                        "code_128",
+                        "code_39",
+                        "code_93",
+                        "codabar",
+                        "ean_13",
+                        "ean_8",
+                        "itf",
+                        "qr_code",
+                        "upc_a",
+                        "upc_e",
+                      ],
+                    }}
                     onCapture={(e) => handleScan(e[0].rawValue)}
                   />
                 )}
@@ -303,7 +271,7 @@ const App: React.FC = () => {
               {/* <Form.Item>
                   <Button icon={<UploadOutlined />}>Click to Upload</Button>
               </Form.Item> */}
-              
+
               <Form.Item>
                 <Button type="primary" htmlType="submit">
                   Submit
@@ -338,7 +306,10 @@ const App: React.FC = () => {
                       key="default"
                       type="link"
                       danger
-                      onClick={() => deleteItem(item.id)}
+                      onClick={async () => {
+                        deleteItem(item.id, userId);
+                        setData(await getData(userId));
+                      }}
                     >
                       Delete
                     </Button>,
@@ -384,7 +355,13 @@ const App: React.FC = () => {
               renderItem={(item) => (
                 <List.Item
                   actions={[
-                    <Button key="" onClick={() => removeFromList(item.id)}>
+                    <Button
+                      key=""
+                      onClick={async () => {
+                        await removeFromList(item.id, userId!);
+                        setListData(await fetchListData(userId!));
+                      }}
+                    >
                       Remove
                     </Button>,
                   ]}
