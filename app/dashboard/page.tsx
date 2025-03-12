@@ -24,6 +24,8 @@ import {
 import { BarcodeScanner } from "react-barcode-scanner";
 import "react-barcode-scanner/polyfill";
 import { CameraOutlined } from "@ant-design/icons";
+import { signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 const layout = {
   labelCol: { span: 8 },
@@ -47,6 +49,8 @@ const App: React.FC = () => {
   const [barcode, setBarcode] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   // Handle authentication state changes
+  const router = useRouter(); 
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
@@ -185,6 +189,16 @@ const App: React.FC = () => {
   };
 
   const { Title } = Typography;
+
+
+  function logout(){
+    try{
+      signOut(auth)
+      router.push("/")
+    }catch(e){
+      console.log(e)
+    }
+  }
 
   return (
     <>
@@ -442,6 +456,7 @@ const App: React.FC = () => {
             </Modal>
           </div>
         </div>
+        <Button onClick={logout}>Log Out</Button>
       </div>
     </>
   );
