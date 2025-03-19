@@ -8,7 +8,9 @@ import {
   Modal,
   Card,
   List,
+  Image,
   Typography,
+  Spin,
   // Upload,
 } from "antd";
 import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
@@ -26,6 +28,12 @@ import "react-barcode-scanner/polyfill";
 import { CameraOutlined } from "@ant-design/icons";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { Upload } from "antd";
+import type { UploadFile } from "antd";
+import ImgCrop from "antd-img-crop";
+import { uploadFile } from "@/functions/firebaseStorage";
+import { LoadingOutlined } from "@ant-design/icons";
+import imageCompression from "browser-image-compression";
 
 const layout = {
   labelCol: { span: 8 },
@@ -48,8 +56,10 @@ const App: React.FC = () => {
   const [currentData, setCurrentData] = useState<ItemData[]>();
   const [barcode, setBarcode] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [loading, setLoading] = useState(false); // Track loading state
+
   // Handle authentication state changes
-  const router = useRouter(); 
+  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -79,55 +89,80 @@ const App: React.FC = () => {
     form.resetFields();
   };
 
+  const compressImage = async (file: File) => {
+    const options = {
+      maxSizeMB: 0.2, // Max file size (e.g., 0.2MB)
+      maxWidthOrHeight: 800, // Max width or height
+      useWebWorker: true, // Improves performance
+    };
+  
+    try {
+      const compressedFile = await imageCompression(file, options);
+      return compressedFile;
+    } catch (error) {
+      console.error("Error compressing image:", error);
+      return file; // Return original file if compression fails
+    }
+  };
+  
   const onFinish = async (values: Partial<ItemData>) => {
+    setLoading(true); // Show loading spinner
+  
     if (!userId) {
       console.error("User not authenticated.");
+      setLoading(false);
       return;
     }
-
+  
     try {
       if (!values.name || !values.cost) {
         throw new Error("Name, Cost, and Company are required fields.");
       }
+  
+      let imageUrl = "";
+  
+      // If a file is selected, compress and upload it
+      if (fileList.length > 0) {
+        const file = fileList[0].originFileObj as File;
+        const compressedFile = await compressImage(file); // Compress the image
+        imageUrl = (await uploadFile(userId, compressedFile)) || ""; // Upload compressed file
+      }
+  
+      const itemData = {
+        name: values.name,
+        company: values.company,
+        cost: values.cost,
+        description: values.description || "",
+        barcode: values.barcode || "",
+        quantity: values.quantity || 0,
+        imageUrl,
+      };
+  
       if (!isEditing) {
-        const docRef = await addDoc(collection(db, "users", userId, "items"), {
-          name: values.name,
-          company: values.company,
-          cost: values.cost,
-          description: values.description || "",
-          barcode: values.barcode || "",
-          quantity: values.quantity || 0,
-        });
+        const docRef = await addDoc(collection(db, "users", userId, "items"), itemData);
         console.log("Document written with ID: ", docRef.id);
       } else {
-        const docRef = doc(
-          db,
-          "users",
-          userId as string,
-          "items",
-          currentObjectId as string
-        );
-        await updateDoc(docRef, {
-          name: values.name,
-          company: values.company,
-          cost: values.cost,
-          description: values.description || "",
-          barcode: values.barcode || "",
-          quantity: values.quantity || 0,
-        });
+        const docRef = doc(db, "users", userId, "items", currentObjectId as string);
+        await updateDoc(docRef, itemData);
         setIsEditing(false);
       }
+  
+      // Reset state
       setBarcode("");
       form.resetFields();
+      setFileList([]); // Clear file list
       setIsModalOpen(false);
       setCurrentObjectId("");
-
-      setData(await getData(userId)); // Refresh data for the current user
+  
+      // Refresh data
+      setData(await getData(userId));
+      
     } catch (error) {
       console.error("Error adding document: ", error);
+    } finally {
+      setLoading(false); // Hide spinner after processing
     }
   };
-
   const editCard = (item: ItemData) => {
     form.setFieldsValue(item);
     setCurrentObjectId(item.id);
@@ -190,15 +225,35 @@ const App: React.FC = () => {
 
   const { Title } = Typography;
 
-
-  function logout(){
-    try{
-      signOut(auth)
-      router.push("/")
-    }catch(e){
-      console.log(e)
+  function logout() {
+    try {
+      signOut(auth);
+      router.push("/");
+    } catch (e) {
+      console.log(e);
     }
   }
+
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+
+  const onPreview = async (file: UploadFile) => {
+    let src = file.url as string;
+
+    if (!src && file.originFileObj) {
+      src = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file.originFileObj as File);
+        reader.onload = () => resolve(reader.result as string);
+      });
+    }
+
+    if (src) {
+      const imgWindow = window.open("");
+      if (imgWindow) {
+        imgWindow.document.write(`<img src="${src}" style="max-width:100%;"/>`);
+      }
+    }
+  };
 
   return (
     <>
@@ -211,87 +266,120 @@ const App: React.FC = () => {
             onCancel={handleCancel}
             footer={null}
           >
-            <Form
-              {...layout}
-              form={form}
-              name="itemForm"
-              onFinish={onFinish}
-              style={{ padding: 0, margin: 0 }}
-            >
-              <Form.Item
-                name="name"
-                label="Name"
-                rules={[{ required: true, message: "Please enter the name" }]}
+            {loading && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  backgroundColor: "rgba(255, 255, 255, 0.7)",
+                  zIndex: 10,
+                }}
               >
-                <Input />
-              </Form.Item>
-              <Form.Item
-                name="company"
-                label="Company"
-                rules={[
-                  { required: true, message: "Please enter the company" },
-                ]}
-              >
-                <Input />
-              </Form.Item>
-              <Form.Item
-                name="cost"
-                label="Cost"
-                rules={[{ required: true, message: "Please enter the cost" }]}
-              >
-                <InputNumber />
-              </Form.Item>
-              <Form.Item name="quantity" label="Quantity">
-                <InputNumber />
-              </Form.Item>
-              <Form.Item name="description" label="Description">
-                <Input.TextArea />
-              </Form.Item>
-
-              <Form.Item name="barcode" label="Barcode">
-                <Input
-                  value={barcode}
-                  onChange={(e) => setBarcode(e.target.value)}
+                <Spin
+                  indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />}
                 />
-                <Button
-                  type="primary"
-                  icon={<CameraOutlined />}
-                  style={{ marginTop: "3vh" }}
-                  onClick={() => setScannerOpen(!scannerOpen)}
+              </div>
+            )}
+              <Form
+                {...layout}
+                form={form}
+                name="itemForm"
+                onFinish={onFinish}
+                style={{ padding: 0, margin: 0 }}
+              >
+                <Form.Item
+                  name="name"
+                  label="Name"
+                  rules={[{ required: true, message: "Please enter the name" }]}
                 >
-                  {scannerOpen ? "Close Scanner" : "Scan Barcode"}
-                </Button>
-                {scannerOpen && (
-                  <BarcodeScanner
-                    options={{
-                      delay: 500,
-                      formats: [
-                        "code_128",
-                        "code_39",
-                        "code_93",
-                        "codabar",
-                        "ean_13",
-                        "ean_8",
-                        "itf",
-                        "qr_code",
-                        "upc_a",
-                        "upc_e",
-                      ],
-                    }}
-                    onCapture={(e) => handleScan(e[0].rawValue)}
-                  />
-                )}
-              </Form.Item>
-              {/* <Form.Item>
-                  <Button icon={<UploadOutlined />}>Click to Upload</Button>
-              </Form.Item> */}
+                  <Input />
+                </Form.Item>
+                <Form.Item
+                  name="company"
+                  label="Company"
+                  rules={[
+                    { required: true, message: "Please enter the company" },
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+                <Form.Item
+                  name="cost"
+                  label="Cost"
+                  rules={[{ required: true, message: "Please enter the cost" }]}
+                >
+                  <InputNumber />
+                </Form.Item>
+                <Form.Item name="quantity" label="Quantity">
+                  <InputNumber />
+                </Form.Item>
+                <Form.Item name="description" label="Description">
+                  <Input.TextArea />
+                </Form.Item>
 
-              <Form.Item>
-                <Button type="primary" htmlType="submit">
-                  Submit
-                </Button>
-              </Form.Item>
-            </Form>
+                <Form.Item name="barcode" label="Barcode">
+                  <Input
+                    value={barcode}
+                    onChange={(e) => setBarcode(e.target.value)}
+                  />
+                  <Button
+                    type="primary"
+                    icon={<CameraOutlined />}
+                    style={{ marginTop: "3vh" }}
+                    onClick={() => setScannerOpen(!scannerOpen)}
+                  >
+                    {scannerOpen ? "Close Scanner" : "Scan Barcode"}
+                  </Button>
+                  {scannerOpen && (
+                    <BarcodeScanner
+                      options={{
+                        delay: 500,
+                        formats: [
+                          "code_128",
+                          "code_39",
+                          "code_93",
+                          "codabar",
+                          "ean_13",
+                          "ean_8",
+                          "itf",
+                          "qr_code",
+                          "upc_a",
+                          "upc_e",
+                        ],
+                      }}
+                      onCapture={(e) => handleScan(e[0].rawValue)}
+                    />
+                  )}
+                </Form.Item>
+                <Form.Item>
+                  <ImgCrop rotationSlider>
+                    <Upload
+                      listType="picture-card"
+                      fileList={fileList}
+                      beforeUpload={() => false} // Prevent auto upload
+                      onChange={({ fileList: newFileList }) =>
+                        setFileList(newFileList)
+                      }
+                      onPreview={onPreview}
+                    >
+                      {fileList.length < 1 && "+ Upload"}
+                    </Upload>
+                  </ImgCrop>
+                </Form.Item>
+
+                <Form.Item>
+                  <Button type="primary" htmlType="submit" onClick={() => setLoading(true)}>
+                    Submit
+                  </Button>
+                </Form.Item>
+              </Form>
+            
           </Modal>
 
           <List
@@ -321,7 +409,7 @@ const App: React.FC = () => {
                       type="link"
                       danger
                       onClick={async () => {
-                        deleteItem(item.id, userId);
+                        await deleteItem(item.id, userId);
                         setData(await getData(userId));
                       }}
                     >
@@ -345,15 +433,20 @@ const App: React.FC = () => {
                     </Button>,
                   ]}
                 >
-                  <p>
-                    <strong>Company:</strong> {item.company}
-                  </p>
-                  <p>
-                    <strong>Cost:</strong> ${item.cost}
-                  </p>
-                  <p>
-                    <strong>Quantity:</strong> {item.quantity}
-                  </p>
+                  <div>
+                    <div>
+                      <p>
+                        <strong>Company:</strong> {item.company}
+                      </p>
+                      <p>
+                        <strong>Cost:</strong> ${item.cost}
+                      </p>
+                      <p>
+                        <strong>Quantity:</strong> {item.quantity}
+                      </p>
+                    </div>
+                    <Image width={200} src={item.image} alt="no image" />
+                  </div>
                 </Card>
               </List.Item>
             )}

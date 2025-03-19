@@ -6,4 +6,5 @@ export interface ItemData {
   description: string;
   barcode: string;
   quantity: number;
+  image: string
 }
